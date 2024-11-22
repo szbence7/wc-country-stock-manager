@@ -1,0 +1,41 @@
+# Copyright (C) 2024 Your Name
+# This file is distributed under the same license as the WC Country Stock Manager package.
+msgid ""
+msgstr ""
+"Project-Id-Version: WC Country Stock Manager 1.0.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/wc-country-stock-manager\n"
+"POT-Creation-Date: 2024-03-20 12:00:00+00:00\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"PO-Revision-Date: 2024-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+
+#: includes/class-wcsm-admin.php:XX
+msgid "Country Stock Manager"
+msgstr ""
+
+#: includes/class-wcsm-admin.php:XX
+msgid "Country Stock"
+msgstr ""
+
+#: includes/class-wcsm-admin.php:XX
+msgid "Managed Countries"
+msgstr ""
+
+#: includes/class-wcsm-admin.php:XX
+msgid "Stock"
+msgstr ""
+
+#: includes/class-wcsm-admin.php:XX
+msgid "Price"
+msgstr ""
+
+#: includes/class-wcsm-admin.php:XX
+msgid "Save Changes"
+msgstr ""
+
+#: wc-country-stock-manager.php:XX
+msgid "WC Country Stock Manager requires WooCommerce to be installed and active."
+msgstr ""
