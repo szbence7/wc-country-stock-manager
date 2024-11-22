@@ -5,17 +5,19 @@ if (!defined('ABSPATH')) {
 
 class WCSM_Admin {
     public function __construct() {
-        add_action('admin_menu', [$this, 'add_admin_menu'], 99);
+        add_action('admin_menu', [$this, 'add_admin_menus'], 99);
         add_action('admin_init', [$this, 'init_settings']);
         add_action('woocommerce_product_data_tabs', [$this, 'add_product_data_tab']);
         add_action('woocommerce_product_data_panels', [$this, 'add_product_data_panel']);
         add_action('woocommerce_process_product_meta', [$this, 'save_product_data']);
         add_action('admin_menu', [$this, 'add_log_submenu'], 101);
+        add_action('wp_ajax_wcsm_save_product_data', [$this, 'ajax_save_product_data']);
+        add_action('wp_ajax_wcsm_bulk_update', [$this, 'ajax_bulk_update']);
+        add_action('admin_init', [$this, 'handle_export']);
     }
 
-    public function add_admin_menu() {
-        error_log('WCSM: Adding admin menu');
-        
+    public function add_admin_menus() {
+        // Főmenü
         add_menu_page(
             __('Country Stock Manager', 'wc-country-stock-manager'),
             __('Country Stock', 'wc-country-stock-manager'),
@@ -24,6 +26,36 @@ class WCSM_Admin {
             [$this, 'render_settings_page'],
             'dashicons-store',
             56
+        );
+
+        // Almenük
+        add_submenu_page(
+            'wc-country-stock',
+            __('Settings', 'wc-country-stock-manager'),
+            __('Settings', 'wc-country-stock-manager'),
+            'manage_woocommerce',
+            'wc-country-stock',
+            [$this, 'render_settings_page']
+        );
+
+        // Termék lista almenü
+        add_submenu_page(
+            'wc-country-stock',
+            __('Products', 'wc-country-stock-manager'),
+            __('Products', 'wc-country-stock-manager'),
+            'manage_woocommerce',
+            'wc-country-stock-products',
+            [$this, 'render_products_page']
+        );
+
+        // Log almenü
+        add_submenu_page(
+            'wc-country-stock',
+            __('Stock Log', 'wc-country-stock-manager'),
+            __('Stock Log', 'wc-country-stock-manager'),
+            'manage_woocommerce',
+            'wc-country-stock-log',
+            [$this, 'render_log_page']
         );
     }
 
@@ -325,6 +357,289 @@ class WCSM_Admin {
             </table>
         </div>
         <?php
+    }
+
+    public function render_products_page() {
+        $managed_countries = get_option('wcsm_managed_countries', []);
+        $all_countries = WC()->countries->get_countries();
+        $selected_country = isset($_GET['country']) ? sanitize_text_field($_GET['country']) : reset($managed_countries);
+        
+        // Search/Filter parameters
+        $search = isset($_GET['search']) ? sanitize_text_field($_GET['search']) : '';
+        $category = isset($_GET['category']) ? intval($_GET['category']) : 0;
+        $stock_status = isset($_GET['stock_status']) ? sanitize_text_field($_GET['stock_status']) : '';
+        
+        // Pagination settings
+        $per_page = 20;
+        $current_page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
+        
+        // Build query args
+        $args = [
+            'limit' => $per_page,
+            'offset' => ($current_page - 1) * $per_page,
+            'status' => 'publish',
+            'paginate' => true
+        ];
+
+        if ($search) {
+            $args['s'] = $search;
+        }
+        if ($category) {
+            $args['category'] = [$category];
+        }
+        if ($stock_status) {
+            $args['stock_status'] = $stock_status;
+        }
+
+        // Get paginated products
+        $products_query = wc_get_products($args);
+        $products = $products_query->products;
+        $total_products = $products_query->total;
+        $total_pages = ceil($total_products / $per_page);
+        ?>
+        <div class="wrap">
+            <h1 class="wp-heading-inline"><?php echo esc_html__('Country Stock Products', 'wc-country-stock-manager'); ?></h1>
+            
+            <!-- Export Button -->
+            <form method="post" class="wcsm-export-form" style="display: inline-block; margin-left: 10px;">
+                <?php wp_nonce_field('wcsm_export', 'wcsm_export_nonce'); ?>
+                <input type="hidden" name="action" value="wcsm_export">
+                <input type="hidden" name="country" value="<?php echo esc_attr($selected_country); ?>">
+                <button type="submit" class="page-title-action">
+                    <?php _e('Export to CSV', 'wc-country-stock-manager'); ?>
+                </button>
+            </form>
+
+            <!-- Filters -->
+            <div class="wcsm-filters">
+                <form method="get" id="product-filter-form">
+                    <input type="hidden" name="page" value="wc-country-stock-products">
+                    
+                    <!-- Country Selector -->
+                    <select name="country" id="country-selector">
+                        <?php foreach ($managed_countries as $code): ?>
+                            <option value="<?php echo esc_attr($code); ?>" 
+                                    <?php selected($code, $selected_country); ?>>
+                                <?php echo esc_html($all_countries[$code]); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+
+                    <!-- Search -->
+                    <input type="text" 
+                           id="product-search" 
+                           name="search" 
+                           value="<?php echo esc_attr($search); ?>" 
+                           placeholder="<?php esc_attr_e('Search products...', 'wc-country-stock-manager'); ?>">
+
+                    <!-- Category Filter -->
+                    <?php
+                    wp_dropdown_categories([
+                        'taxonomy' => 'product_cat',
+                        'name' => 'category',
+                        'show_option_all' => __('All Categories', 'wc-country-stock-manager'),
+                        'selected' => $category
+                    ]);
+                    ?>
+
+                    <!-- Stock Status -->
+                    <select name="stock_status">
+                        <option value=""><?php _e('All Stock Status', 'wc-country-stock-manager'); ?></option>
+                        <option value="instock" <?php selected($stock_status, 'instock'); ?>>
+                            <?php _e('In Stock', 'wc-country-stock-manager'); ?>
+                        </option>
+                        <option value="outofstock" <?php selected($stock_status, 'outofstock'); ?>>
+                            <?php _e('Out of Stock', 'wc-country-stock-manager'); ?>
+                        </option>
+                    </select>
+
+                    <button type="submit" class="button"><?php _e('Filter', 'wc-country-stock-manager'); ?></button>
+                </form>
+            </div>
+
+            <!-- Bulk Actions -->
+            <div class="wcsm-bulk-actions">
+                <select id="bulk-action-selector">
+                    <option value=""><?php _e('Bulk Actions', 'wc-country-stock-manager'); ?></option>
+                    <option value="update_stock"><?php _e('Update Stock', 'wc-country-stock-manager'); ?></option>
+                    <option value="update_price"><?php _e('Update Price', 'wc-country-stock-manager'); ?></option>
+                </select>
+                <input type="number" id="bulk-stock" placeholder="<?php esc_attr_e('Stock', 'wc-country-stock-manager'); ?>">
+                <input type="number" step="0.01" id="bulk-price" placeholder="<?php esc_attr_e('Price', 'wc-country-stock-manager'); ?>">
+                <button id="bulk-action-button" class="button"><?php _e('Apply', 'wc-country-stock-manager'); ?></button>
+            </div>
+
+            <!-- Products Table -->
+            <table class="wp-list-table widefat fixed striped">
+                <thead>
+                    <tr>
+                        <th class="check-column">
+                            <input type="checkbox" id="select-all-products">
+                        </th>
+                        <th><?php _e('Product', 'wc-country-stock-manager'); ?></th>
+                        <th><?php _e('SKU', 'wc-country-stock-manager'); ?></th>
+                        <th><?php _e('Stock', 'wc-country-stock-manager'); ?></th>
+                        <th><?php _e('Price', 'wc-country-stock-manager'); ?></th>
+                        <th><?php _e('Actions', 'wc-country-stock-manager'); ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php
+                    foreach ($products as $product) {
+                        $stock = WCSM_Product::get_country_stock($product->get_id(), $selected_country);
+                        $price = WCSM_Product::get_country_price($product->get_id(), $selected_country);
+                        ?>
+                        <tr>
+                            <td class="check-column">
+                                <input type="checkbox" class="product-select" value="<?php echo esc_attr($product->get_id()); ?>">
+                            </td>
+                            <td>
+                                <a href="<?php echo get_edit_post_link($product->get_id()); ?>">
+                                    <?php echo esc_html($product->get_name()); ?>
+                                </a>
+                            </td>
+                            <td><?php echo esc_html($product->get_sku()); ?></td>
+                            <td>
+                                <input type="number" 
+                                       class="stock-input" 
+                                       data-product="<?php echo esc_attr($product->get_id()); ?>"
+                                       data-country="<?php echo esc_attr($selected_country); ?>"
+                                       value="<?php echo esc_attr($stock); ?>">
+                            </td>
+                            <td>
+                                <input type="number" 
+                                       step="0.01" 
+                                       class="price-input"
+                                       data-product="<?php echo esc_attr($product->get_id()); ?>"
+                                       data-country="<?php echo esc_attr($selected_country); ?>"
+                                       value="<?php echo esc_attr($price); ?>">
+                            </td>
+                            <td>
+                                <button class="button save-row" 
+                                        data-product="<?php echo esc_attr($product->get_id()); ?>">
+                                    <?php _e('Save', 'wc-country-stock-manager'); ?>
+                                </button>
+                            </td>
+                        </tr>
+                        <?php
+                    }
+                    ?>
+                </tbody>
+            </table>
+
+            <!-- Add pagination after the table -->
+            <div class="wcsm-pagination">
+                <?php
+                echo paginate_links([
+                    'base' => add_query_arg('paged', '%#%'),
+                    'format' => '',
+                    'prev_text' => __('&laquo; Previous'),
+                    'next_text' => __('Next &raquo;'),
+                    'total' => $total_pages,
+                    'current' => $current_page,
+                    'type' => 'list'
+                ]);
+                ?>
+                <p class="wcsm-pagination-info">
+                    <?php
+                    printf(
+                        __('Showing %1$d-%2$d of %3$d products', 'wc-country-stock-manager'),
+                        (($current_page - 1) * $per_page) + 1,
+                        min($current_page * $per_page, $total_products),
+                        $total_products
+                    );
+                    ?>
+                </p>
+            </div>
+        </div>
+        <?php
+    }
+
+    public function ajax_save_product_data() {
+        check_ajax_referer('wcsm_nonce', 'security');
+
+        $product_id = intval($_POST['product_id']);
+        $country = sanitize_text_field($_POST['country']);
+        $stock = intval($_POST['stock']);
+        $price = floatval($_POST['price']);
+
+        WCSM_Product::update_country_stock($product_id, $country, $stock);
+        WCSM_Product::update_country_price($product_id, $country, $price);
+
+        wp_send_json_success();
+    }
+
+    public function ajax_bulk_update() {
+        check_ajax_referer('wcsm_nonce', 'security');
+
+        $action = sanitize_text_field($_POST['bulk_action']);
+        $country = sanitize_text_field($_POST['country']);
+        $products = array_map('intval', $_POST['products']);
+        
+        foreach ($products as $product_id) {
+            switch ($action) {
+                case 'update_stock':
+                    WCSM_Product::update_country_stock($product_id, $country, intval($_POST['stock']));
+                    break;
+                case 'update_price':
+                    WCSM_Product::update_country_price($product_id, $country, floatval($_POST['price']));
+                    break;
+            }
+        }
+
+        wp_send_json_success();
+    }
+
+    public function handle_export() {
+        if (!isset($_POST['action']) || $_POST['action'] !== 'wcsm_export') {
+            return;
+        }
+
+        if (!isset($_POST['wcsm_export_nonce']) || !wp_verify_nonce($_POST['wcsm_export_nonce'], 'wcsm_export')) {
+            wp_die('Invalid nonce');
+        }
+
+        $country = sanitize_text_field($_POST['country']);
+        $products = wc_get_products(['limit' => -1]);
+        
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename=country-stock-' . $country . '-' . date('Y-m-d') . '.csv');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+
+        $output = fopen('php://output', 'w');
+        
+        // CSV Header
+        fputcsv($output, [
+            'Product ID',
+            'Product Name',
+            'SKU',
+            'Category',
+            'Stock',
+            'Price',
+            'Regular Price',
+            'Sale Price'
+        ]);
+
+        // CSV Data
+        foreach ($products as $product) {
+            $terms = get_the_terms($product->get_id(), 'product_cat');
+            $category = $terms ? $terms[0]->name : '';
+            
+            fputcsv($output, [
+                $product->get_id(),
+                $product->get_name(),
+                $product->get_sku(),
+                $category,
+                WCSM_Product::get_country_stock($product->get_id(), $country),
+                WCSM_Product::get_country_price($product->get_id(), $country),
+                $product->get_regular_price(),
+                $product->get_sale_price()
+            ]);
+        }
+
+        fclose($output);
+        exit;
     }
 }
 

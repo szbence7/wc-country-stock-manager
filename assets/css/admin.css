@@ -21,4 +21,34 @@
 .wcsm-settings-page .form-table td label {
     display: block;
     margin-bottom: 5px;
+}
+
+.wcsm-pagination {
+    margin: 20px 0;
+    text-align: center;
+}
+
+.wcsm-pagination .page-numbers {
+    display: inline-block;
+    padding: 5px 10px;
+    margin: 0 2px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    background: #f7f7f7;
+    text-decoration: none;
+}
+
+.wcsm-pagination .current {
+    background: #0073aa;
+    color: #fff;
+    border-color: #0073aa;
+}
+
+.wcsm-pagination-info {
+    margin-top: 10px;
+    color: #666;
+}
+
+.wcsm-export-form {
+    margin: 15px 0;
 } 
