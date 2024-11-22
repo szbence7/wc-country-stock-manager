@@ -23,10 +23,7 @@ class WCSM_Install {
         $wpdb->hide_errors();
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
 
-        $collate = '';
-        if ($wpdb->has_cap('collation')) {
-            $collate = $wpdb->get_charset_collate();
-        }
+        $collate = $wpdb->get_charset_collate();
 
         // Country stock table
         $sql = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}wcsm_country_stock (
@@ -39,6 +36,28 @@ class WCSM_Install {
             stock_status VARCHAR(20) NOT NULL DEFAULT 'instock',
             PRIMARY KEY  (id),
             KEY product_country (product_id, country_code)
+        ) $collate;";
+
+        dbDelta($sql);
+
+        // New log table
+        $sql = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}wcsm_stock_log (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            product_id BIGINT UNSIGNED NOT NULL,
+            country_code VARCHAR(2) NOT NULL,
+            old_stock INT NOT NULL,
+            new_stock INT NOT NULL,
+            old_price DECIMAL(19,4) NULL,
+            new_price DECIMAL(19,4) NULL,
+            change_type VARCHAR(50) NOT NULL,
+            order_id BIGINT UNSIGNED NULL,
+            user_id BIGINT UNSIGNED NULL,
+            ip_address VARCHAR(100) NULL,
+            created_at DATETIME NOT NULL,
+            notes TEXT NULL,
+            PRIMARY KEY (id),
+            KEY product_country (product_id, country_code),
+            KEY created_at (created_at)
         ) $collate;";
 
         dbDelta($sql);

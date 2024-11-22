@@ -7,6 +7,8 @@ class WCSM_Product {
     public function __construct() {
         add_filter('woocommerce_product_get_price', [$this, 'get_country_specific_price'], 10, 2);
         add_filter('woocommerce_product_get_stock_quantity', [$this, 'get_country_specific_stock'], 10, 2);
+        add_action('woocommerce_reduce_order_stock', [$this, 'reduce_country_stock']);
+        add_action('woocommerce_restore_order_stock', [$this, 'restore_country_stock']);
     }
 
     public function get_country_specific_price($price, $product) {
@@ -112,6 +114,46 @@ class WCSM_Product {
                 ['%d', '%s']
             );
         }
+    }
+
+    public function reduce_country_stock($order_id) {
+        $order = wc_get_order($order_id);
+        $country_code = $this->get_order_country($order);
+
+        foreach ($order->get_items() as $item) {
+            $product_id = $item->get_product_id();
+            $qty = $item->get_quantity();
+            
+            $current_stock = self::get_country_stock($product_id, $country_code);
+            if ($current_stock !== null) {
+                $new_stock = max(0, $current_stock - $qty);
+                self::update_country_stock($product_id, $country_code, $new_stock);
+            }
+        }
+    }
+
+    public function restore_country_stock($order_id) {
+        $order = wc_get_order($order_id);
+        $country_code = $this->get_order_country($order);
+
+        foreach ($order->get_items() as $item) {
+            $product_id = $item->get_product_id();
+            $qty = $item->get_quantity();
+            
+            $current_stock = self::get_country_stock($product_id, $country_code);
+            if ($current_stock !== null) {
+                $new_stock = $current_stock + $qty;
+                self::update_country_stock($product_id, $country_code, $new_stock);
+            }
+        }
+    }
+
+    private function get_order_country($order) {
+        $shipping_country = $order->get_shipping_country();
+        if (!empty($shipping_country)) {
+            return $shipping_country;
+        }
+        return $order->get_billing_country();
     }
 }
 
