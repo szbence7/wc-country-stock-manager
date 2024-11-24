@@ -51,4 +51,50 @@
 
 .wcsm-export-form {
     margin: 15px 0;
+}
+
+.wcsm-current-country {
+    background: #fff;
+    padding: 15px 20px;
+    margin: 20px 0;
+    border-left: 4px solid #2271b1;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+}
+
+.wcsm-current-country h2 {
+    margin: 0;
+    font-size: 16px;
+    line-height: 1.4;
+}
+
+.wcsm-current-country .country-name {
+    font-weight: 600;
+    color: #2271b1;
+}
+
+.wcsm-country-switcher {
+    margin: 20px 0;
+    padding: 10px;
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 3px;
+}
+
+.wcsm-country-switcher .country-link {
+    display: inline-block;
+    padding: 6px 12px;
+    margin: 0 5px;
+    text-decoration: none;
+    border-radius: 3px;
+    color: #2271b1;
+}
+
+.wcsm-country-switcher .country-link:hover {
+    background: #f0f0f1;
+}
+
+.wcsm-country-switcher .country-link.active {
+    background: #2271b1;
+    color: #fff;
+    font-weight: 500;
 } 

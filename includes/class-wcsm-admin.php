@@ -10,14 +10,13 @@ class WCSM_Admin {
         add_action('woocommerce_product_data_tabs', [$this, 'add_product_data_tab']);
         add_action('woocommerce_product_data_panels', [$this, 'add_product_data_panel']);
         add_action('woocommerce_process_product_meta', [$this, 'save_product_data']);
-        add_action('admin_menu', [$this, 'add_log_submenu'], 101);
         add_action('wp_ajax_wcsm_save_product_data', [$this, 'ajax_save_product_data']);
         add_action('wp_ajax_wcsm_bulk_update', [$this, 'ajax_bulk_update']);
         add_action('admin_init', [$this, 'handle_export']);
     }
 
     public function add_admin_menus() {
-        // Főmenü
+        // Main menu (this serves as the settings page)
         add_menu_page(
             __('Country Stock Manager', 'wc-country-stock-manager'),
             __('Country Stock', 'wc-country-stock-manager'),
@@ -28,27 +27,7 @@ class WCSM_Admin {
             56
         );
 
-        // Almenük
-        add_submenu_page(
-            'wc-country-stock',
-            __('Settings', 'wc-country-stock-manager'),
-            __('Settings', 'wc-country-stock-manager'),
-            'manage_woocommerce',
-            'wc-country-stock',
-            [$this, 'render_settings_page']
-        );
-
-        // Termék lista almenü
-        add_submenu_page(
-            'wc-country-stock',
-            __('Products', 'wc-country-stock-manager'),
-            __('Products', 'wc-country-stock-manager'),
-            'manage_woocommerce',
-            'wc-country-stock-products',
-            [$this, 'render_products_page']
-        );
-
-        // Log almenü
+        // Keep other submenus if they exist
         add_submenu_page(
             'wc-country-stock',
             __('Stock Log', 'wc-country-stock-manager'),
@@ -238,17 +217,6 @@ class WCSM_Admin {
         }
     }
 
-    public function add_log_submenu() {
-        add_submenu_page(
-            'wc-country-stock',
-            __('Stock Log', 'wc-country-stock-manager'),
-            __('Stock Log', 'wc-country-stock-manager'),
-            'manage_woocommerce',
-            'wc-country-stock-log',
-            [$this, 'render_log_page']
-        );
-    }
-
     public function render_log_page() {
         global $wpdb;
         
@@ -364,42 +332,30 @@ class WCSM_Admin {
         $all_countries = WC()->countries->get_countries();
         $selected_country = isset($_GET['country']) ? sanitize_text_field($_GET['country']) : reset($managed_countries);
         
-        // Search/Filter parameters
-        $search = isset($_GET['search']) ? sanitize_text_field($_GET['search']) : '';
-        $category = isset($_GET['category']) ? intval($_GET['category']) : 0;
-        $stock_status = isset($_GET['stock_status']) ? sanitize_text_field($_GET['stock_status']) : '';
-        
-        // Pagination settings
-        $per_page = 20;
-        $current_page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
-        
-        // Build query args
-        $args = [
-            'limit' => $per_page,
-            'offset' => ($current_page - 1) * $per_page,
-            'status' => 'publish',
-            'paginate' => true
-        ];
-
-        if ($search) {
-            $args['s'] = $search;
-        }
-        if ($category) {
-            $args['category'] = [$category];
-        }
-        if ($stock_status) {
-            $args['stock_status'] = $stock_status;
-        }
-
-        // Get paginated products
-        $products_query = wc_get_products($args);
-        $products = $products_query->products;
-        $total_products = $products_query->total;
-        $total_pages = ceil($total_products / $per_page);
         ?>
         <div class="wrap">
             <h1 class="wp-heading-inline"><?php echo esc_html__('Country Stock Products', 'wc-country-stock-manager'); ?></h1>
             
+            <!-- Current Country Display -->
+            <div class="wcsm-current-country">
+                <h2>
+                    <?php printf(
+                        __('Currently viewing: %s', 'wc-country-stock-manager'),
+                        '<span class="country-name">' . esc_html($all_countries[$selected_country]) . '</span>'
+                    ); ?>
+                </h2>
+            </div>
+
+            <!-- Quick Country Switch -->
+            <div class="wcsm-country-switcher">
+                <?php foreach ($managed_countries as $code): ?>
+                    <a href="<?php echo add_query_arg('country', $code); ?>" 
+                       class="country-link <?php echo ($code === $selected_country) ? 'active' : ''; ?>">
+                        <?php echo esc_html($all_countries[$code]); ?>
+                    </a>
+                <?php endforeach; ?>
+            </div>
+
             <!-- Export Button -->
             <form method="post" class="wcsm-export-form" style="display: inline-block; margin-left: 10px;">
                 <?php wp_nonce_field('wcsm_export', 'wcsm_export_nonce'); ?>
